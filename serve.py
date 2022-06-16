@@ -6,6 +6,10 @@ import os
 app = Flask(__name__, static_folder='dist', static_url_path='')
 
 
+def get_repo():
+    return git.Repo('../temp')
+
+
 def find_files_recursively(path, skip_predicate):
     for entry in os.scandir(os.path.join(*path)):
         if entry.is_dir():
@@ -23,9 +27,30 @@ def get_working_area_files():
 
 
 def get_staging_area_files():
-    repo = git.Repo('../temp')
+    repo = get_repo()
     index = repo.index
+    for stage, blob in index.iter_blobs():
+        print(f'{blob.name} {blob.size}')
     return [path.split('/') for path, stage in index.entries]
+
+
+def get_branches(repo):
+    return {head.name: head.commit.hexsha for head in repo.heads}
+
+
+def build_commit_graph(repo):
+    graph = {}
+    for commit in repo.iter_commits():
+        graph[commit.hexsha] = [parent.hexsha for parent in commit.parents]
+    return graph
+
+
+def collect_repository_information():
+    repo = get_repo()
+    return {
+        'branches': get_branches(repo),
+        'commits': build_commit_graph(repo),
+    }
 
 
 @app.route('/api/v1/working-area')
@@ -45,5 +70,24 @@ def staging_area():
     }
     return jsonify(data)
 
+
+@app.route('/api/v1/repository')
+def repository():
+    data = collect_repository_information()
+    return jsonify(data)
+
+
+@app.route('/api/v1/repository/commits/<hexsha>')
+def commit(hexsha):
+    repo = get_repo()
+    commit = repo.commit(hexsha)
+    print(dir(commit))
+    data = {
+        'author': commit.author.name,
+        'message': commit.message,
+        'parents': [parent.hexsha for parent in commit.parents],
+        'date': str(commit.committed_datetime)
+    }
+    return jsonify(data)
 
 app.run()
