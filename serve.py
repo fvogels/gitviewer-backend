@@ -45,11 +45,27 @@ def build_commit_graph(repo):
     return graph
 
 
+def get_head_information(repo):
+    head = repo.head
+    if head.is_detached:
+        return {
+            'is_detached': True,
+            'commit': head.commit.hexsha,
+        }
+    else:
+        return {
+            'is_detached': False,
+            'branch': head.ref.name,
+            'commit': head.commit.hexsha,
+        }
+
+
 def collect_repository_information():
     repo = get_repo()
     return {
         'branches': get_branches(repo),
         'commits': build_commit_graph(repo),
+        'HEAD':get_head_information(repo),
     }
 
 
