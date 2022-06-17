@@ -40,8 +40,9 @@ def get_branches(repo):
 
 def build_commit_graph(repo):
     graph = {}
-    for commit in repo.iter_commits():
-        graph[commit.hexsha] = [parent.hexsha for parent in commit.parents]
+    for branch in get_branches(repo).keys():
+        for commit in repo.iter_commits(branch):
+            graph[commit.hexsha] = [parent.hexsha for parent in commit.parents]
     return graph
 
 
