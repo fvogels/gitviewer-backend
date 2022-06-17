@@ -6,8 +6,10 @@ import os
 app = Flask(__name__, static_folder='dist', static_url_path='')
 
 
+REPOSITORY_ROOT = '../temp'
+
 def get_repo():
-    return git.Repo('../temp')
+    return git.Repo(REPOSITORY_ROOT)
 
 
 def find_files_recursively(path, skip_predicate):
@@ -23,14 +25,12 @@ def get_working_area_files():
     def skip_git_dir(name):
         return name == '.git'
 
-    return list(path[1:] for path in find_files_recursively(['../temp'], skip_git_dir))
+    return list(path[1:] for path in find_files_recursively([REPOSITORY_ROOT], skip_git_dir))
 
 
 def get_staging_area_files():
     repo = get_repo()
     index = repo.index
-    for stage, blob in index.iter_blobs():
-        print(f'{blob.name} {blob.size}')
     return [path.split('/') for path, stage in index.entries]
 
 
@@ -62,11 +62,41 @@ def working_area():
     return jsonify(data)
 
 
+@app.route('/api/v1/working-area/<path:path>')
+def working_area_file(path):
+    path_parts = path.split('/')
+    with open(os.path.join(REPOSITORY_ROOT, *path_parts), 'r') as f:
+        contents = f.read()
+    data = {
+        'path': path,
+        'contents': contents
+    }
+    return jsonify(data)
+
+
 @app.route('/api/v1/staging-area')
 def staging_area():
     files = get_staging_area_files()
     data = {
         'files': files
+    }
+    return jsonify(data)
+
+
+@app.route('/api/v1/staging-area/<path:path>')
+def staging_area_file(path):
+    def select_blob(pair):
+        stage, blob = pair
+        print(blob.path)
+        return blob.path == path
+
+    repo = get_repo()
+    index = repo.index
+    blob = next(index.iter_blobs(select_blob))[1]
+
+    data = {
+        'path': path,
+        'contents': blob.data_stream.read().decode('utf-8'),
     }
     return jsonify(data)
 
